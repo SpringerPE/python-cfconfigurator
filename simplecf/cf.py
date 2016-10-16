@@ -48,9 +48,11 @@ class CF(object):
     auth_token_url = '/oauth/token'
     quotas_url = '/v2/quota_definitions'
     shared_domains_url = '/v2/shared_domains'
+    private_domains_url = '/v2/private_domains'
     organizations_url = '/v2/organizations'
     spaces_url = '/v2/spaces'
     organization_space_url = '/v2/organizations/%s/spaces'
+    organization_domains_url = '/v2/organizations/%s/private_domains'
     secgroups_url = '/v2/security_groups'
     secgroups_running_url = '/v2/config/running_security_groups'
     secgroups_staging_url = '/v2/config/staging_security_groups'
@@ -58,7 +60,6 @@ class CF(object):
     blobstores_builpack_cache_url = '/v2/blobstores/buildpack_cache'
     environment_variable_group_url = '/v2/config/environment_variable_groups'
     feature_flags_url = '/v2/config/feature_flags'
-
 
     def __init__(self, api_url, username='', password='', ca_cert=None):
         self.session = requests.Session()
@@ -72,6 +73,51 @@ class CF(object):
         self.api_url = api_url
         self.username = str(username)
         self.password = str(password)
+
+    def info(self):
+        """Gets info endpoint. Used to perform login auth."""
+        url = self.api_url + self.info_url
+        resp = self.session.get(url)
+        if resp.status_code != 200:
+            error = {'description': "Info HTTP response not valid"}
+            raise CFException(error, resp.status_code)
+        try:
+            info = resp.json()
+        except ValueError as e:
+            error = {'description': "Info HTTP response not valid, %s" % str(e)}
+            raise CFException(error, resp.status_code)
+        return info
+
+    def login(self, username=None, password=None):
+        """Performs login with the provided credentials or the last ones used"""
+        auth = None
+        if username is not None:
+            self.username = str(username)
+        if password is not None:
+            self.password = str(password)
+        if self.username:
+            url = self.info()['token_endpoint'] + self.auth_token_url
+            headers = {
+                'Authorization': "Basic %s" % base64.b64encode("%s:%s" % ('cf', '')),
+                'Content-Type': "application/x-www-form-urlencoded"
+            }
+            params = {
+                'username': self.username,
+                'password': self.password,
+                'client_id': 'cf',
+                'grant_type': 'password',
+                'response_type': 'token'
+            }
+            resp = self.session.post(url, params=params, headers=headers)
+            if resp.status_code == requests.codes.ok:
+                auth = resp.json()
+                self.session.headers.update({
+                    'Authorization': ("%s %s" % (auth['token_type'], auth['access_token']))
+                })
+            else:
+                error = {'description': "Login HTTP response not valid"}
+                raise CFException(error, resp.status_code)
+        return auth
 
     def _request(self, method, url, params=None, http_headers=None, data=None):
         if http_headers:
@@ -100,6 +146,7 @@ class CF(object):
                 raise CFException(error, resp.status_code)
         return response, resp.status_code
 
+
     def _get(self, url, params=None):
         resp, rcode = self._request('GET', url, params)
         if rcode != 200:
@@ -122,56 +169,9 @@ class CF(object):
         method = 'POST' if create else 'PUT'
         json_data = None if data is None else json.dumps(data)
         resp, rcode = self._request(method, url, None, None, json_data)
-        if rcode != 201 or rcode != 200:
+        if rcode != 201 and rcode != 200:
             raise CFException(resp, rcode)
         return resp
-
-
-    def info(self):
-        """Gets info endpoint. Used to perform login auth."""
-        url = self.api_url + self.info_url
-        resp = self.session.get(url)
-        if resp.status_code != 200:
-            error = {'description': "Info HTTP response not valid"}
-            raise CFException(error, resp.status_code)
-        try:
-            info = resp.json()
-        except ValueError as e:
-            error = {'description': "Info HTTP response not valid, %s" % str(e)}
-            raise CFException(error, resp.status_code)
-        return info
-
-
-    def login(self, username='', password=''):
-        """Performs login with the provided credentials or the last ones used"""
-        auth = None
-        if username:
-            self.username = str(username)
-        if password:
-            self.password = str(password)
-        if self.username:
-            url = self.info()['token_endpoint'] + self.auth_token_url
-            headers = {
-                'Authorization': "Basic %s" % base64.b64encode("%s:%s" % ('cf', '')),
-                'Content-Type': "application/x-www-form-urlencoded"
-            }
-            params = {
-                'username': self.username,
-                'password': self.password,
-                'client_id': 'cf',
-                'grant_type': 'password',
-                'response_type': 'token'
-            }
-            resp = self.session.post(url, params=params, headers=headers)
-            if resp.status_code == requests.codes.ok:
-                auth = resp.json()
-                self.session.headers.update({
-                    'Authorization': ("%s %s" % (auth['token_type'], auth['access_token']))
-                })
-            else:
-                error = {'description': "Login HTTP response not valid"}
-                raise CFException(error, resp.status_code)
-        return auth
 
 
     def clean_blobstore_cache(self):
@@ -189,7 +189,7 @@ class CF(object):
 
     def manage_variable_group(self, key, value='', name="running", add=True):
         url = self.api_url + self.environment_variable_group_url + '/' + name
-        variable = str(value)
+        variable_value = str(value)
         variable_name = str(key)
         if '-' in variable_name:
             raise ValueError("name not valid for an enviroment variable")
@@ -197,11 +197,11 @@ class CF(object):
         variables = self.get_variable_group(name)
         if add:
             if variable_name in variables:
-                if variables[variable_name] != variable:
-                    variables[variable_name] = variable
+                if variables[variable_name] != variable_value:
+                    variables[variable_name] = variable_value
                     changed = True
             else:
-                variables[variable_name] = variable
+                variables[variable_name] = variable_value
                 changed = True
         else:
             try:
@@ -294,22 +294,61 @@ class CF(object):
         return self._update(create, url, data)
 
 
-    def search_shared_domain(self, name):
-        url = self.api_url + self.shared_domains_url
+    def search_domain(self, name, kind="private"):
+        if kind == "private":
+            url = self.api_url + self.private_domains_url
+        elif kind == "shared":
+            url = self.api_url + self.shared_domains_url
+        else:
+            raise ValueError("invalid domain type, options: private or shared")
         params = {'q': "name:%s" % str(name)}
         return self._search(url, params)
 
-    def delete_shared_domain(self, guid, async=False):
-        url = self.api_url + self.shared_domains_url + '/' + guid
+    def delete_domain(self, guid, kind="private", async=False):
+        if kind == "private":
+            url = self.api_url + self.private_domains_url + '/' + guid
+        elif kind == "shared":
+            url = self.api_url + self.shared_domains_url + '/' + guid
+        else:
+            raise ValueError("invalid domain type, options: private or shared")
         params = {'async': str(async).lower() }
         self._delete(url, params)
 
     def create_shared_domain(self, name, router_group_guid=None):
         url = self.api_url + self.shared_domains_url
-        data = {'name': name }
+        data = {'name': str(name) }
         if router_group_guid is not None:
             data['router_group_guid'] = str(router_group_guid)
         return self._update(True, url, data)
+
+    def create_private_domain(self, name, owning_organization_guid):
+        url = self.api_url + self.private_domains_url
+        data = {
+            'name': str(name),
+            'owning_organization_guid': str(owning_organization_guid)
+        }
+        return self._update(True, url, data)
+
+    def manage_private_domain_organization(self, guid, org_guid, add=True):
+        url = self.api_url + self.organization_domains_url % org_guid
+        resp = self._get(url)
+        found = False
+        for d in resp['resources']:
+            if d['metadata']['guid'] == guid:
+                found = True
+                break
+        set_url = url + '/' + guid
+        if add:
+            if not found:
+                # add domain to the org
+                self._update(False, set_url)
+                return True
+        else:
+            if found:
+                # delete domain from org
+                self._delete(set_url)
+                return True
+        return False
 
 
     def search_space(self, org_guid, name):
@@ -402,7 +441,7 @@ class CF(object):
             secgroup_guid = resp['metadata']['guid']
             secgroup_name = resp['entity']['name']
             return self.save_secgroup(secgroup_name, rules, None, secgroup_guid)
-        return changed
+        return None
 
     def manage_secgroup_space(self, guid, space_guid, add=True):
         url = self.api_url + self.secgroups_space_url % guid
@@ -410,7 +449,7 @@ class CF(object):
         resp = self._get(url, params)
         found = False
         for sp in resp['resources']:
-            if space_guid == resp['metadata']['guid']:
+            if space_guid == sp['metadata']['guid']:
                 found = True
                 break
         set_url = url + '/' + space_guid
@@ -436,7 +475,7 @@ class CF(object):
         found = False
         resp = self._get(url)
         for sg in resp['resources']:
-            if guid == resp['metadata']['guid']:
+            if guid == sg['metadata']['guid']:
                 found = True
                 break
         set_url = url + '/' + guid

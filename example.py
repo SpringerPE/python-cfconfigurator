@@ -1,0 +1,14 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+from simplecf.cf import CF
+
+api_url = "https://api.test.cf.springer-sbm.com"
+admin_user = "admin"
+admin_password = "admin"
+
+cf = CF(api_url)
+cf.login(admin_user, admin_password)
+
+org = cf.search_org("pivotal")
+print(org)

@@ -26,12 +26,11 @@ SOFTWARE.
 from __future__ import unicode_literals, print_function
 
 import json
-import base64
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
+from .exceptions import CFException
 
-from exceptions import CFException
 
 __program__ = "simplecf"
 __version__ = "0.1.0"
@@ -97,8 +96,11 @@ class CF(object):
             self.password = str(password)
         if self.username:
             url = self.info()['token_endpoint'] + self.auth_token_url
+            ## import base64
+            ## Y2Y6 = base64.b64encode("%s:%s" % ('cf', ''))
+            authorization = "Y2Y6"
             headers = {
-                'Authorization': "Basic %s" % base64.b64encode("%s:%s" % ('cf', '')),
+                'Authorization': "Basic %s" % authorization,
                 'Content-Type': "application/x-www-form-urlencoded"
             }
             params = {

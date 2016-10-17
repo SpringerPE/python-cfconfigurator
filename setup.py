@@ -48,7 +48,7 @@ def find_requirements(f='requirements.txt'):
 
 
 setup(
-    name="simpleCF",
+    name="pysimplecf",
     url="https://github.com/SpringerPE/python-simplecf",
     version=find_version('simplecf/cf.py'),
     keywords='cf cloudfoundry cloud foundry lib',

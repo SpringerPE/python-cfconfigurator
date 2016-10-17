@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-python-simpleCF is a simple and small library to manage Cloud Foundry
+python-cfconfigurator is a simple and small library to manage Cloud Foundry
 (c) 2016 Jose Riguera Lopez, jose.riguera@springer.com
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -32,7 +32,7 @@ requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 from .exceptions import CFException
 
 
-__program__ = "simplecf"
+__program__ = "cfconfigurator"
 __version__ = "0.1.0"
 __author__ = "Jose Riguera"
 __year__ = "2016"
@@ -42,7 +42,7 @@ __license__ = "MIT"
 
 
 class CF(object):
-    user_agent = "python-simplecf"
+    user_agent = "python-cfconfigurator"
     info_url = '/v2/info'
     auth_token_url = '/oauth/token'
     quotas_url = '/v2/quota_definitions'

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from simplecf.cf import CF
+from cfconfigurator.cf import CF
 
 api_url = "https://api.test.cf.springer-sbm.com"
 admin_user = "admin"

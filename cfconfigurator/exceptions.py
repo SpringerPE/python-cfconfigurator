@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-python-simpleCF is a simple and small library to manage Cloud Foundry
+python-cfconfigurator is a simple and small library to manage Cloud Foundry
 (c) 2016 Jose Riguera Lopez, jose.riguera@springer.com
 
 Permission is hereby granted, free of charge, to any person obtaining a copy

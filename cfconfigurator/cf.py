@@ -29,27 +29,25 @@ import json
 import requests
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-from .exceptions import CFException
 
-
-__program__ = "cfconfigurator"
-__version__ = "0.1.0"
-__author__ = "Jose Riguera"
-__year__ = "2016"
-__email__ = "<jose.riguera@springer.com>"
-__license__ = "MIT"
+from .exceptions import CFException, UAAException
+from .uaa import UAA
 
 
 
 class CF(object):
     user_agent = "python-cfconfigurator"
     info_url = '/v2/info'
-    auth_token_url = '/oauth/token'
-    quotas_url = '/v2/quota_definitions'
-    shared_domains_url = '/v2/shared_domains'
-    private_domains_url = '/v2/private_domains'
-    organizations_url = '/v2/organizations'
     spaces_url = '/v2/spaces'
+    users_url = '/v2/users'
+    users_organizations_url = '/v2/users/%s/organizations'
+    users_managed_organizations_url = '/v2/users/%s/managed_organizations'
+    users_audited_organizations_url = '/v2/users/%s/audited_organizations'
+    users_billing_managed_organizations_url = '/v2/users/%s/billing_managed_organizations'
+    users_audited_spaces_url = '/v2/users/%s/audited_spaces'
+    users_managed_spaces_url = '/v2/users/%s/managed_spaces'
+    users_spaces_url = '/v2/users/%s/spaces'
+    organizations_url = '/v2/organizations'
     organization_space_url = '/v2/organizations/%s/spaces'
     organization_domains_url = '/v2/organizations/%s/private_domains'
     secgroups_url = '/v2/security_groups'
@@ -59,8 +57,11 @@ class CF(object):
     blobstores_builpack_cache_url = '/v2/blobstores/buildpack_cache'
     environment_variable_group_url = '/v2/config/environment_variable_groups'
     feature_flags_url = '/v2/config/feature_flags'
+    quotas_url = '/v2/quota_definitions'
+    shared_domains_url = '/v2/shared_domains'
+    private_domains_url = '/v2/private_domains'
 
-    def __init__(self, api_url, username='', password='', ca_cert=None):
+    def __init__(self, api_url, client_id='cf', client_secret='', ca_cert=None):
         self.session = requests.Session()
         self.session.headers.update({
             "Accept": "application/json",
@@ -70,8 +71,21 @@ class CF(object):
         self.session.verify = True if ca_cert else False
         self.session.cert = ca_cert if ca_cert else None
         self.api_url = api_url
-        self.username = str(username)
-        self.password = str(password)
+        api_auth_url = self.info()['token_endpoint']
+        self.uaa = UAA(api_auth_url, client_id, client_secret)
+        self.username = None
+        self.password = ''
+
+    def _login(self):
+        try:
+            auth = self.uaa.login(self.usename, self.password)
+        except UAAException as e:
+            error = {'description': str(e)}
+            raise CFException(error)
+        self.session.headers.update({
+            'Authorization': ("%s %s" % (auth['token_type'], auth['access_token']))
+        })
+        return auth
 
     def info(self):
         """Gets info endpoint. Used to perform login auth."""
@@ -87,39 +101,11 @@ class CF(object):
             raise CFException(error, resp.status_code)
         return info
 
-    def login(self, username=None, password=None):
-        """Performs login with the provided credentials or the last ones used"""
-        auth = None
-        if username is not None:
-            self.username = str(username)
-        if password is not None:
-            self.password = str(password)
-        if self.username:
-            url = self.info()['token_endpoint'] + self.auth_token_url
-            ## import base64
-            ## Y2Y6 = base64.b64encode("%s:%s" % ('cf', ''))
-            authorization = "Y2Y6"
-            headers = {
-                'Authorization': "Basic %s" % authorization,
-                'Content-Type': "application/x-www-form-urlencoded"
-            }
-            params = {
-                'username': self.username,
-                'password': self.password,
-                'client_id': 'cf',
-                'grant_type': 'password',
-                'response_type': 'token'
-            }
-            resp = self.session.post(url, params=params, headers=headers)
-            if resp.status_code == requests.codes.ok:
-                auth = resp.json()
-                self.session.headers.update({
-                    'Authorization': ("%s %s" % (auth['token_type'], auth['access_token']))
-                })
-            else:
-                error = {'description': "Login HTTP response not valid"}
-                raise CFException(error, resp.status_code)
-        return auth
+    def login(self, username=None, password=''):
+        """Performs login with the provided credentials"""
+        self.username = username
+        self.password = password
+        return self._login()
 
     def _request(self, method, url, params=None, http_headers=None, data=None):
         if http_headers:
@@ -137,9 +123,10 @@ class CF(object):
                 if ('error_code' in response and (
                     response['error_code'] == 'CF-InvalidAuthToken' or
                     response['error_code'] == 'CF-NotAuthenticated')):
-                    if self.login():
-                        resp = self.session.send(prepared_req)
-                        response = resp.json()
+                    # try again
+                    self._login()
+                    resp = self.session.send(prepared_req)
+                    response = resp.json()
         except ValueError as e:
             if len(resp.content) == 0:
                 response = {}
@@ -353,8 +340,8 @@ class CF(object):
         return False
 
 
-    def search_space(self, org_guid, name):
-        url = self.api_url + self.organization_space_url % org_guid
+    def search_space(self, orguid, name):
+        url = self.api_url + self.organization_space_url % orguid
         params = {'q': "name:%s" % str(name)}
         return self._search(url, params)
 
@@ -366,7 +353,7 @@ class CF(object):
         }
         self._delete(url, params)
 
-    def save_space(self, org_guid, name, allow_ssh=None, guid=None):
+    def save_space(self, orguid, name, allow_ssh=None, guid=None):
         url = self.api_url + self.spaces_url
         create = True
         if guid is not None:
@@ -374,7 +361,7 @@ class CF(object):
             create = False
         data = {
             'name': str(name),
-            'organization_guid': str(org_guid),
+            'organization_guid': str(orguid),
         }
         if allow_ssh is not None:
             data['allow_ssh'] = allow_ssh
@@ -386,16 +373,16 @@ class CF(object):
         params = {'q': "name:%s" % str(name)}
         return self._search(url, params)
 
-    def delete_secgroup(self, guid, async=False):
-        url = self.api_url + self.secgroups_url + '/' + guid
+    def delete_secgroup(self, secguid, async=False):
+        url = self.api_url + self.secgroups_url + '/' + secguid
         params = {'async': str(async).lower() }
         self._delete(url, params)
 
-    def save_secgroup(self, name, rules=[], space_guids=[], guid=None):
+    def save_secgroup(self, name, rules=[], space_guids=[], secguid=None):
         url = self.api_url + self.secgroups_url
         create = True
-        if guid is not None:
-            url = url + '/' + guid
+        if secguid is not None:
+            url = url + '/' + secguid
             create = False
         data = {'name': name }
         if rules is not None:
@@ -404,12 +391,12 @@ class CF(object):
             data['space_guids'] = space_guids
         return self._update(create, url, data)
 
-    def manage_secgroup_rule(self, guid, rule, add=True):
+    def manage_secgroup_rule(self, secguid, rule, add=True):
         # add == True => add
         # add == False => del
         if 'description' not in rule:
             raise ValueError("rule must have a description")
-        url = self.api_url + self.secgroups_url + '/' + guid
+        url = self.api_url + self.secgroups_url + '/' + secguid
         resp = self._get(url)
         rules = []
         changed = False
@@ -445,8 +432,8 @@ class CF(object):
             return self.save_secgroup(secgroup_name, rules, None, secgroup_guid)
         return None
 
-    def manage_secgroup_space(self, guid, space_guid, add=True):
-        url = self.api_url + self.secgroups_space_url % guid
+    def manage_secgroup_space(self, secguid, space_guid, add=True):
+        url = self.api_url + self.secgroups_space_url % secguid
         params = {'space_guid': space_guid }
         resp = self._get(url, params)
         found = False
@@ -467,20 +454,170 @@ class CF(object):
                 return True
         return False
 
-    def manage_secgroup_defaults(self, guid, name="running", add=True):
+    def manage_secgroup_defaults(self, secguid, name="running", add=True):
+        url = self.api_url
         if name == "running":
-            url = self.api_url + self.secgroups_running_url
+            url += self.secgroups_running_url
         elif name == "staging":
-            url = self.api_url + self.secgroups_staging_url
+            url += self.secgroups_staging_url
         else:
-            raise ValueError("invalid default sec group, options: running or staging")
+            raise ValueError("Invalid default sec group, options: running or staging")
         found = False
         resp = self._get(url)
         for sg in resp['resources']:
-            if guid == sg['metadata']['guid']:
+            if secguid == sg['metadata']['guid']:
                 found = True
                 break
-        set_url = url + '/' + guid
+        set_url = url + '/' + secguid
+        if add:
+            if not found:
+                # add
+                self._update(False, set_url)
+                return True
+        else:
+            if found:
+                self._delete(set_url)
+                return True
+        return False
+
+
+    def search_user(self, name):
+        # find by name or email
+        search = {
+            'userName': str(name),
+            'emails.value': str(name)
+        }
+        try:
+            result = self.uaa.user_find(search, 'or')
+        except UAAException as e:
+            error = {
+                'description': str(e),
+                'error_code': 'CF-UAA'
+            }
+            raise CFException(error)
+        if result['totalResults'] == 0:
+            return None
+        elif result['totalResults'] == 1:
+            user_id = result['resources'][0]['id']
+            url = self.api_url + self.users_url + '/' + user_id
+            return self._get(url)
+        else:
+            error = {'description': "Too many users found!"}
+            raise CFException(error)
+
+    def save_user(self, name, givenName, familyName, email, password=None,
+                  active=True, origin='uaa', externalId='',
+                  default_space_guid=None, force_pass=True, user_id=None):
+        url = self.api_url + self.users_url
+        changed = False
+        try:
+            if user_id is not None:
+                user = self.uaa.user_get(user_id)
+                changed = changed if name == user['userName'] else True
+                changed = changed if givenName == user['name']['familyName'] else True
+                changed = changed if givenName == user['name']['givenName'] else True
+                changed = changed if active == user['active'] else True
+                changed = changed if origin == user['origin'] else True
+                changed = changed if externalId == user['externalId'] else True
+                for e in user['emails']:
+                    if email == e['value']:
+                        break
+                else:
+                    changed = True
+                self.uaa.user_save(
+                    name, [givenName, familyName], password, [email],
+                    active=active, origin=origin, externalId=externalId,
+                    id=user_id)
+                if force_pass:
+                    # Special UAA privs are required to change passwords!
+                    self.uaa.user_set_password(user_id, password)
+            else:
+                changed = True
+                user = self.uaa.user_save(
+                    name, [givenName, familyName], password, [email],
+                    active=active, origin=origin, externalId=externalId)
+                user_id = user['id']
+        except UAAException as e:
+            error = {
+                'description': str(e),
+                'error_code': 'CF-UAA'
+            }
+            raise CFException(error)
+        create = False
+        try:
+            self._get(url + '/' + user_id)
+            url = url + '/' + user_id
+        except CFException:
+            # new user in CF
+            create = True
+        data = {'guid': user_id }
+        if default_space_guid is not None:
+            data['default_space_guid'] = default_space_guid
+        return changed, self._update(create, url, data)
+
+    def delete_user(self, guid, async=False, uaa=True):
+        url = self.api_url + self.users_url + '/' + guid
+        params = {'async': str(async).lower() }
+        self._delete(url, params)
+        if uaa:
+            try:
+                self.uaa.user_delete(guid)
+            except UAAException as e:
+                error = {
+                    'description': str(e),
+                    'error_code': 'CF-UAA'
+                }
+                raise CFException(error)
+
+    def manage_organization_users(self, orguid, userid, role='user', add=True):
+        url = self.api_url
+        if role == 'user':
+            url += self.users_organizations_url
+        elif role == 'manager':
+            url += self.users_managed_organizations_url
+        elif role == 'auditor':
+            url += self.users_audited_organizations_url
+        elif role == 'billing_manager':
+            url += self.users_billing_managed_organizations_url
+        else:
+            raise ValueError("Invalid role, options: user, manager, auditor or billing_manager")
+        url = url % userid
+        found = False
+        resp = self._get(url)
+        for org in resp['resources']:
+            if orguid == org['metadata']['guid']:
+                found = True
+                break
+        set_url = url + '/' + orguid
+        if add:
+            if not found:
+                # add
+                self._update(False, set_url)
+                return True
+        else:
+            if found:
+                self._delete(set_url)
+                return True
+        return False
+
+    def manage_space_users(self, spuid, userid, role='user', add=True):
+        url = self.api_url
+        if role == 'user':
+            url += self.users_spaces_url
+        elif role == 'manager':
+            url += self.users_managed_spaces_url
+        elif role == 'auditor':
+            url += self.users_audited_spaces_url
+        else:
+            raise ValueError("Invalid role, options: user, manager, auditor")
+        url = url % userid
+        found = False
+        resp = self._get(url)
+        for spa in resp['resources']:
+            if spuid == spa['metadata']['guid']:
+                found = True
+                break
+        set_url = url + '/' + spuid
         if add:
             if not found:
                 # add

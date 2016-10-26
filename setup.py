@@ -50,7 +50,7 @@ def find_requirements(f='requirements.txt'):
 setup(
     name="cfconfigurator",
     url="https://github.com/SpringerPE/python-cfconfigurator",
-    version=find_version('cfconfigurator/cf.py'),
+    version=find_version('cfconfigurator/__init__.py'),
     keywords='cf cloudfoundry cloud foundry lib',
     description="Simple and small library to manage Cloud Foundry",
     long_description=find_readme(),
@@ -58,7 +58,7 @@ setup(
     author_email="jose.riguera@springer.com",
     license='MIT',
     packages=find_packages(exclude=['docs', 'tests']),
-    download_url="https://github.com/SpringerPE/python-cfconfigurator/releases/tag/v" + find_version('cfconfigurator/cf.py'),
+    download_url="https://github.com/SpringerPE/python-cfconfigurator/releases/tag/v" + find_version('cfconfigurator/__init__.py'),
 
     # Include additional files into the package
     include_package_data=True,

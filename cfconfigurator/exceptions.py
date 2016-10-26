@@ -26,9 +26,8 @@ SOFTWARE.
 from __future__ import unicode_literals
 
 
-
 class CFException(Exception):
-    """Raise for CF exceptions"""
+    """CF exceptions"""
 
     def __init__(self, response, http_code=400):
         self.description = response.get('description', '')
@@ -38,3 +37,16 @@ class CFException(Exception):
         message = "%s (%s): %s [%s]" % (self.error_code, self.code, self.description, self.http_code)
         super(CFException, self).__init__(message)
 
+
+class UAAException(Exception):
+    """UAA exceptions"""
+
+    def __init__(self, response, http_code=400):
+        self.description = response.get('description', '')
+        self.error = response.get('error', 'Unknown')
+        self.message = response.get('message', '')
+        self.http_code = http_code
+        message = "UAA error (%s): %s [%s]" % (self.error, self.message, self.http_code)
+        if self.description:
+            message = message + ' ' + self.description
+        super(UAAException, self).__init__(message)

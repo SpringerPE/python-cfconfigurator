@@ -208,7 +208,7 @@ class UAA(object):
         url = self.api_url + self.user_url
         return self._find(url, filters, op, attributes)
 
-    def user_get(self, id, version='0'):
+    def user_get(self, id, version='*'):
         url = self.api_url + self.user_url + '/' + str(id)
         headers = {'If-Match': version }
         resp, rc = self._request('GET', url, http_headers=headers)
@@ -216,7 +216,7 @@ class UAA(object):
 
     def user_save(self, name, usernames, password='', emails=[], active=True,
                   verified=True, phones=[], origin='uaa', externalId='',
-                  id=None, version='0'):
+                  id=None, version='*'):
         url = self.api_url + self.user_url
         data = {
             'userName': name,
@@ -262,7 +262,7 @@ class UAA(object):
             data['password'] = password
         return self._save(url, data, headers, id)
 
-    def user_set_password(self, id, password, version='0'):
+    def user_set_password(self, id, password, version='*'):
         url = self.api_url + self.user_password_url % str(id)
         data = {"password": str(password) }
         headers = {'If-Match': version }

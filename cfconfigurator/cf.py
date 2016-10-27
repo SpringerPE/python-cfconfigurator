@@ -78,7 +78,7 @@ class CF(object):
 
     def _login(self):
         try:
-            auth = self.uaa.login(self.usename, self.password)
+            auth = self.uaa.login(self.username, self.password)
         except UAAException as e:
             error = {'description': str(e)}
             raise CFException(error)
@@ -505,36 +505,50 @@ class CF(object):
             error = {'description': "Too many users found!"}
             raise CFException(error)
 
-    def save_user(self, name, givenName, familyName, email, password=None,
-                  active=True, origin='uaa', externalId='',
+    def save_user(self, name, givenName, familyName, email=None, password=None,
+                  active=True, origin='uaa', externalId=None,
                   default_space_guid=None, force_pass=True, user_id=None):
         url = self.api_url + self.users_url
         changed = False
         try:
             if user_id is not None:
                 user = self.uaa.user_get(user_id)
-                changed = changed if name == user['userName'] else True
-                changed = changed if givenName == user['name']['familyName'] else True
-                changed = changed if givenName == user['name']['givenName'] else True
-                changed = changed if active == user['active'] else True
-                changed = changed if origin == user['origin'] else True
-                changed = changed if externalId == user['externalId'] else True
-                for e in user['emails']:
-                    if email == e['value']:
-                        break
-                else:
+                changed = not (
+                    name == user['userName'] and
+                    familyName == user['name']['familyName'] and
+                    givenName == user['name']['givenName'] and
+                    active == user['active'] and
+                    origin == user['origin']
+                )
+                if externalId is not None:
+                    if 'externalId' not in user:
+                        changed = True
+                    elif externalId != user['externalId']:
+                        changed = True
+                elif 'externalId' in user:
                     changed = True
-                self.uaa.user_save(
-                    name, [givenName, familyName], password, [email],
-                    active=active, origin=origin, externalId=externalId,
-                    id=user_id)
+                email_list = []
+                if email is not None:
+                    email_list = [e['value'] for e in user['emails']]
+                    if email not in email_list:
+                        changed = True
+                        email_list.append(email)
+                else:
+                    # it allows other emails
+                    email_list = [e['value'] for e in user['emails']]
+                if changed:
+                    self.uaa.user_save(
+                        name, [givenName, familyName], password, email_list,
+                        active=active, origin=origin, externalId=externalId,
+                        id=user_id)
                 if force_pass:
                     # Special UAA privs are required to change passwords!
                     self.uaa.user_set_password(user_id, password)
             else:
                 changed = True
+                email_list = [] if email is None else [email]
                 user = self.uaa.user_save(
-                    name, [givenName, familyName], password, [email],
+                    name, [givenName, familyName], password, email_list,
                     active=active, origin=origin, externalId=externalId)
                 user_id = user['id']
         except UAAException as e:

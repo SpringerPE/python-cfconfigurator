@@ -42,7 +42,8 @@ print(org)
 
 ## TODO
 
-Buildpack management
+* Tests, tests ... fix me!
+* Buildpack management
 
 
 ## Author

@@ -41,7 +41,7 @@ print(org)
 
 ## Upload to PyPI
 
-1 .Create a `.pypirc` configuration file. This file holds your information for authenticating with PyPI.
+1. Create a `.pypirc` configuration file. This file holds your information for authenticating with PyPI.
 
    ```
    [distutils]
@@ -52,7 +52,7 @@ print(org)
    username=your_username
    password=your_password
    ```
-2 .Login and upload it to PyPI
+2. Login and upload it to PyPI
 
    ```
    python setup.py register -r pypi

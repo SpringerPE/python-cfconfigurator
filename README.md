@@ -42,21 +42,22 @@ print(org)
 ## Upload to PyPI
 
 1 .Create a `.pypirc` configuration file. This file holds your information for authenticating with PyPI.
-    ```
-    [distutils]
-    index-servers = pypi
-   
-    [pypi]
-    repository=https://pypi.python.org/pypi
-    username=your_username
-    password=your_password
-    ```
 
-2. Login and upload it to PyPI
-    ```
-    python setup.py register -r pypi
-    python setup.py sdist upload -r pypi
-    ```
+   ```
+   [distutils]
+   index-servers = pypi
+   
+   [pypi]
+   repository=https://pypi.python.org/pypi
+   username=your_username
+   password=your_password
+   ```
+2 .Login and upload it to PyPI
+
+   ```
+   python setup.py register -r pypi
+   python setup.py sdist upload -r pypi
+   ```
 
 
 ## TODO

@@ -107,7 +107,7 @@ class CF(object):
         self.password = password
         return self._login()
 
-    def _request(self, method, url, params=None, http_headers=None, data=None):
+    def request(self, method, url, params=None, http_headers=None, data=None):
         if http_headers:
             headers = dict(self.session.headers)
             headers.update(http_headers)
@@ -137,7 +137,7 @@ class CF(object):
 
 
     def _get(self, url, params=None):
-        resp, rcode = self._request('GET', url, params)
+        resp, rcode = self.request('GET', url, params)
         if rcode != 200:
             raise CFException(resp, rcode)
         return resp
@@ -150,14 +150,14 @@ class CF(object):
             return resp['resources'][0]
 
     def _delete(self, url, params=None):
-        resp, rcode = self._request('DELETE', url, params)
+        resp, rcode = self.request('DELETE', url, params)
         if rcode != 204:
             raise CFException(resp, rcode)
 
     def _update(self, create, url, data=None):
         method = 'POST' if create else 'PUT'
         json_data = None if data is None else json.dumps(data)
-        resp, rcode = self._request(method, url, None, None, json_data)
+        resp, rcode = self.request(method, url, None, None, json_data)
         if rcode != 201 and rcode != 200:
             raise CFException(resp, rcode)
         return resp
@@ -166,7 +166,7 @@ class CF(object):
     def clean_blobstore_cache(self):
         """Deletes all of the existing buildpack caches in the blobstore"""
         url = self.api_url + self.blobstores_builpack_cache_url
-        resp, rcode = self._request('DELETE', url)
+        resp, rcode = self.request('DELETE', url)
         if rcode != 202:
             raise CFException(resp, rcode)
         return resp
@@ -200,7 +200,7 @@ class CF(object):
                 pass
         if changed:
             json_data = json.dumps(variables)
-            resp, rcode = self._request('PUT', url, None, None, json_data)
+            resp, rcode = self.request('PUT', url, None, None, json_data)
             if rcode != 200:
                 raise CFException(resp, rcode)
         return changed
@@ -217,7 +217,7 @@ class CF(object):
             data = {
                 'enabled': enabled
             }
-            resp, rcode = self._request('PUT', url, None, None, json.dumps(data))
+            resp, rcode = self.request('PUT', url, None, None, json.dumps(data))
             if rcode != 200:
                 raise CFException(resp, rcode)
             return True

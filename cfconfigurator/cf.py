@@ -107,7 +107,7 @@ class CF(object):
         self.password = password
         return self._login()
 
-    def request(self, method, url, params=None, http_headers=None, data=None):
+    def _request(self, method, url, params=None, http_headers=None, data=None):
         if http_headers:
             headers = dict(self.session.headers)
             headers.update(http_headers)
@@ -135,6 +135,32 @@ class CF(object):
                 raise CFException(error, resp.status_code)
         return response, resp.status_code
 
+    def request(self, method, url, params=None, http_headers=None, data=None):
+        api = self.api_url
+        if url.startswith('/'):
+            url = api + url
+        else:
+            parsed = requests.compat.urlparse(url)
+            if parsed.scheme == '' or parsed.netloc == '':
+                raise ValueError("url not valid")
+            api = parsed.scheme + "://" + parsed.netloc
+        response, rcode = self._request(method, url, params, http_headers, data)
+        if 'resources' in response and 'total_pages' in response:
+            pages = response['total_pages']
+            pages_counter = 1
+            while response['next_url'] != None and rcode == 200:
+                part_url = api + response['next_url']
+                part_resp, rcode = self._request(method, part_url, None, http_headers, data)
+                pages_counter += 1
+                part_resp['resources'] = response['resources'] + part_resp['resources']
+                response = part_resp
+            if pages_counter != pages:
+                msg = "number of expected pages different than actual pages"
+                error = {'description': "Pagination error " + msg}
+                raise CFException(error, rcode)
+            response['next_url'] = None
+            response['prev_url'] = None
+        return response, rcode
 
     def _get(self, url, params=None):
         resp, rcode = self.request('GET', url, params)

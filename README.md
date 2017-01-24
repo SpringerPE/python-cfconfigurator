@@ -68,5 +68,6 @@ print(org)
 
 ## Author
 
-Jose Riguera Lopez, jose.riguera@springer.com
-SpringerNature Platform Engineering
+Springer Nature Platform Engineering, Jose Riguera Lopez (jose.riguera@springer.com)
+
+Copyright 2017 Springer Nature

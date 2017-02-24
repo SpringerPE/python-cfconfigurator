@@ -541,11 +541,26 @@ class CF(object):
                 user = self.uaa.user_get(user_id)
                 changed = not (
                     name == user['userName'] and
-                    familyName == user['name']['familyName'] and
-                    givenName == user['name']['givenName'] and
                     active == user['active'] and
                     origin == user['origin']
                 )
+                # Users should have user['name']['familyName'] and
+                # user['name']['givenName'] but there are some special cases
+                # (admin, doppler, etc) without those fields
+                names_list = []
+                if 'name' in user:
+                    if 'givenName' in user['name']:
+                        surname = user['name']['givenName']
+                        if givenName != user['name']['givenName']:
+                            changed = True
+                            surname = givenName
+                        names_list.append(surname)
+                    if 'familyName' in user['name']:
+                        surname = user['name']['familyName']
+                        if familyName != user['name']['familyName']:
+                            changed = True
+                            surname = familyName
+                        names_list.append(surname)
                 if externalId is not None:
                     if 'externalId' not in user:
                         changed = True
@@ -558,23 +573,24 @@ class CF(object):
                     email_list = [e['value'] for e in user['emails']]
                     if email not in email_list:
                         changed = True
-                        email_list.append(email)
+                        email_list.insert(0, email)
                 else:
                     # it allows other emails
                     email_list = [e['value'] for e in user['emails']]
                 if changed:
                     self.uaa.user_save(
-                        name, [givenName, familyName], password, email_list,
+                        name, names_list, password, email_list,
                         active=active, origin=origin, externalId=externalId,
                         id=user_id)
                 if force_pass:
                     # Special UAA privs are required to change passwords!
                     self.uaa.user_set_password(user_id, password)
             else:
+                names_list = [givenName, familyName]
                 changed = True
                 email_list = [] if email is None else [email]
                 user = self.uaa.user_save(
-                    name, [givenName, familyName], password, email_list,
+                    name, names_list, password, email_list,
                     active=active, origin=origin, externalId=externalId)
                 user_id = user['id']
         except UAAException as e:

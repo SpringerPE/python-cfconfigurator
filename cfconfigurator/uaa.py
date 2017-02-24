@@ -214,23 +214,23 @@ class UAA(object):
         resp, rc = self._request('GET', url, http_headers=headers)
         return resp
 
-    def user_save(self, name, usernames, password='', emails=[], active=True,
+    def user_save(self, name, usernames=[], password='', emails=[], active=True,
                   verified=True, phones=[], origin='uaa', externalId='',
                   id=None, version='*'):
         url = self.api_url + self.user_url
         data = {
             'userName': name,
             'origin': origin,
-            'name': {
-                'formatted': " ".join(usernames),
-                'familyName': usernames[-1],
-                'givenName': usernames[0],
-            },
+            'name': {},
             'emails': [],
             'phoneNumbers': [],
             'active': active,
             'verified': verified,
         }
+        if usernames:
+            data['name']['formatted'] = " ".join(usernames)
+            data['name']['givenName'] = usernames[0]
+            data['name']['familyName'] = usernames[-1]
         if emails:
             for i, e in enumerate(emails):
                 email = {

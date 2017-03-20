@@ -658,14 +658,14 @@ class CF(object):
 
     def manage_space_users(self, spuid, userid, role='user', add=True):
         url = self.api_url
-        if role == 'user':
+        if role == 'developer':
             url += self.users_spaces_url
         elif role == 'manager':
             url += self.users_managed_spaces_url
         elif role == 'auditor':
             url += self.users_audited_spaces_url
         else:
-            raise ValueError("Invalid role, options: user, manager, auditor")
+            raise ValueError("Invalid role, options: developer, manager, auditor")
         url = url % userid
         found = False
         resp = self._get(url)

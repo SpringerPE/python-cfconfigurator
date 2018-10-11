@@ -5,7 +5,7 @@ python-cfconfigurator
 """
 
 __program__ = "cfconfigurator"
-__version__ = "0.2.4"
+__version__ = "0.2.5"
 __author__ = "Jose Riguera"
 __year__ = "2017"
 __email__ = "<jose.riguera@springer.com>"

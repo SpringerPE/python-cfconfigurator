@@ -3,7 +3,7 @@
 """
 Setuptools module for python-cfconfigurator
 See:
-	https://packaging.python.org/en/latest/distributing.html
+  https://packaging.python.org/en/latest/distributing.html
 """
 
 # Always prefer setuptools over distutils
@@ -11,9 +11,11 @@ from setuptools import setup, find_packages
 # To use a consistent encoding
 from codecs import open
 from os import path
-from pip.download import PipSession
-from pip.req import parse_requirements
 import re
+
+requirements=[
+  "requests>=2.10.0",
+]
 
 
 def find_version(*file_paths):
@@ -24,8 +26,7 @@ def find_version(*file_paths):
         version_file = f.read()
     # The version line must have the form
     # __version__ = 'ver
-    version_match = re.search(
-	r"^__version__ = ['\"]([^'\"]*)['\"]", version_file, re.M)
+    version_match = re.search(r"^__version__ = ['\"]([^'\"]*)['\"]", version_file, re.M)
     if version_match:
         return version_match.group(1)
     raise RuntimeError("Unable to find version string.")
@@ -36,15 +37,8 @@ def find_readme(f="README.md"):
     # Get the long description from the README file
     long_description = None
     with open(path.join(here, f), encoding='utf-8') as f:
-    	long_description = f.read()
+      long_description = f.read()
     return long_description
-
-
-def find_requirements(f='requirements.txt'):
-    # parse_requirements() returns generator of pip.req.InstallRequirement objects
-    reqs = parse_requirements("requirements.txt", session=PipSession())
-    install_reqs = [str(ir.req) for ir in reqs]
-    return install_reqs
 
 
 setup(
@@ -85,5 +79,5 @@ setup(
     ],
 
     # Dependent packages (distributions)
-    install_requires=find_requirements(),
+    install_requires=requirements,
 )
